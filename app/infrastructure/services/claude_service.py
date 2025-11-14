@@ -14,7 +14,7 @@ class ClaudeService:
     """
 
     API_URL = "https://api.anthropic.com/v1/messages"
-    DEFAULT_MODEL = "claude-3-5-sonnet-20241022"
+    DEFAULT_MODEL = "claude-3-haiku-20240307"
     DEFAULT_MAX_TOKENS = 4096
 
     def __init__(self, api_key: Optional[str] = None):

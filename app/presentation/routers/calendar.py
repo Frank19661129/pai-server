@@ -51,6 +51,7 @@ class ConnectedProvider(BaseModel):
     expires_at: Optional[str]
     is_expired: bool
     is_primary: bool
+    connected_at: Optional[str]
 
 
 class CalendarInfo(BaseModel):
@@ -117,7 +118,7 @@ async def start_google_oauth(
     """
     try:
         use_cases = CalendarOAuthUseCases(db)
-        result = await use_cases.start_google_oauth_flow(current_user.id)
+        result = await use_cases.start_google_oauth_flow(current_user["id"])
         return result
     except Exception as e:
         raise HTTPException(
@@ -140,7 +141,7 @@ async def poll_google_oauth(
     try:
         use_cases = CalendarOAuthUseCases(db)
         result = await use_cases.poll_google_oauth_token(
-            user_id=current_user.id,
+            user_id=current_user["id"],
             device_code=request.device_code,
             set_as_primary=request.set_as_primary,
         )
@@ -173,7 +174,7 @@ async def start_microsoft_oauth(
     """
     try:
         use_cases = CalendarOAuthUseCases(db)
-        result = await use_cases.start_microsoft_oauth_flow(current_user.id)
+        result = await use_cases.start_microsoft_oauth_flow(current_user["id"])
         return result
     except Exception as e:
         raise HTTPException(
@@ -196,7 +197,7 @@ async def poll_microsoft_oauth(
     try:
         use_cases = CalendarOAuthUseCases(db)
         result = await use_cases.poll_microsoft_oauth_token(
-            user_id=current_user.id,
+            user_id=current_user["id"],
             device_code=request.device_code,
             set_as_primary=request.set_as_primary,
         )
@@ -235,7 +236,7 @@ async def disconnect_provider(
 
     try:
         use_cases = CalendarOAuthUseCases(db)
-        success = use_cases.disconnect_provider(current_user.id, provider)
+        success = use_cases.disconnect_provider(current_user["id"], provider)
         return {"success": success, "message": f"{provider} disconnected"}
     except ValueError as e:
         raise HTTPException(
@@ -259,7 +260,7 @@ async def get_connected_providers(
     """
     try:
         use_cases = CalendarOAuthUseCases(db)
-        providers = use_cases.get_connected_providers(current_user.id)
+        providers = use_cases.get_connected_providers(current_user["id"])
         return providers
     except Exception as e:
         raise HTTPException(
@@ -284,7 +285,7 @@ async def list_calendars(
     try:
         use_cases = CalendarEventUseCases(db)
         calendars = await use_cases.list_calendars(
-            user_id=current_user.id,
+            user_id=current_user["id"],
             provider=provider,
         )
         return calendars
@@ -317,7 +318,7 @@ async def list_events(
     try:
         use_cases = CalendarEventUseCases(db)
         events = await use_cases.list_events(
-            user_id=current_user.id,
+            user_id=current_user["id"],
             provider=provider,
             calendar_id=calendar_id,
             max_results=max_results,
@@ -349,7 +350,7 @@ async def create_event(
     try:
         use_cases = CalendarEventUseCases(db)
         event = await use_cases.create_event(
-            user_id=current_user.id,
+            user_id=current_user["id"],
             title=request.title,
             start_time=request.start_time,
             end_time=request.end_time,
@@ -387,7 +388,7 @@ async def update_event(
     try:
         use_cases = CalendarEventUseCases(db)
         event = await use_cases.update_event(
-            user_id=current_user.id,
+            user_id=current_user["id"],
             event_id=event_id,
             title=request.title,
             start_time=request.start_time,
@@ -425,7 +426,7 @@ async def delete_event(
     try:
         use_cases = CalendarEventUseCases(db)
         success = await use_cases.delete_event(
-            user_id=current_user.id,
+            user_id=current_user["id"],
             event_id=event_id,
             provider=provider,
             calendar_id=calendar_id,

@@ -202,6 +202,7 @@ class CalendarOAuthUseCases:
                 "expires_at": token.expires_at.isoformat() if token.expires_at else None,
                 "is_expired": self.token_repo.is_token_expired(token),
                 "is_primary": token.provider == primary_provider,
+                "connected_at": token.created_at.isoformat() if token.created_at else None,
             })
 
         return result

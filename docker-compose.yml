@@ -8,6 +8,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8003:8000"  # v1 development port (external:internal) - using 8003 as 8002 is used by claudine-notes
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=postgresql://claudine:claudine_dev_password@claudine-postgres:5432/claudine_v1
       - DEBUG=true

@@ -4,12 +4,15 @@ Part of Application layer - orchestrates conversation operations.
 """
 from typing import Optional, List, AsyncIterator
 from uuid import UUID
+from datetime import datetime
+import json
 from sqlalchemy.orm import Session
 
 from app.domain.entities.conversation import Conversation, Message
 from app.domain.services.command_parser import CommandParser, CommandType
 from app.infrastructure.repositories.conversation_repository import ConversationRepository
 from app.infrastructure.services.claude_service import ClaudeService
+from app.application.use_cases.calendar_event_use_cases import CalendarEventUseCases
 
 
 class ConversationUseCases:
@@ -218,6 +221,11 @@ class ConversationUseCases:
             },
         )
 
+        # Reload conversation to include the new user message
+        conversation = self.get_conversation(conversation_id, user_id)
+        if not conversation:
+            raise ValueError("Failed to reload conversation")
+
         # Handle commands or get AI response
         if parsed_command.is_command():
             response_content = await self._handle_command(parsed_command, conversation)
@@ -253,7 +261,96 @@ class ConversationUseCases:
             return parsed_command.get_help_text()
 
         elif parsed_command.command_type == CommandType.CALENDAR:
-            return "📅 Calendar functie wordt geactiveerd. Wat wil je met je agenda doen?\n\n" + parsed_command.get_help_text()
+            # Use Claude to extract calendar event details from the command
+            try:
+                calendar_use_cases = CalendarEventUseCases(self.db)
+                today = datetime.now().strftime('%Y-%m-%d %H:%M')
+                extraction_prompt = f"""Extract calendar event details from this request: "{parsed_command.original_text}"
+
+Return JSON with:
+- title (string, required)
+- start_time (ISO 8601 datetime, required)
+- end_time (ISO 8601 datetime, required)
+- description (string, optional)
+- location (string, optional)
+
+Current date and time context: {today}
+Use this as reference for relative dates like "morgen" (tomorrow), "volgende week" (next week), etc."""
+
+                response = await self.claude_service.send_message(
+                    messages=[{"role": "user", "content": extraction_prompt}],
+                    system_prompt="You are a calendar assistant. Extract event details and respond with valid JSON only."
+                )
+
+                event_data = json.loads(response["content"][0]["text"])
+
+                # Parse ISO 8601 datetime strings to datetime objects
+                start_time = datetime.fromisoformat(event_data["start_time"].replace('Z', '+00:00'))
+                end_time = datetime.fromisoformat(event_data["end_time"].replace('Z', '+00:00'))
+
+                # Create the calendar event
+                event = await calendar_use_cases.create_event(
+                    user_id=conversation.user_id,
+                    title=event_data["title"],
+                    start_time=start_time,
+                    end_time=end_time,
+                    description=event_data.get("description"),
+                    location=event_data.get("location"),
+                )
+
+                return f"✅ Agenda-afspraak aangemaakt!\n\n📅 **{event.title}**\n🕐 {event.start_time} - {event.end_time}\n📍 {event.location or 'Geen locatie'}\n\nDe afspraak is toegevoegd aan je gekoppelde kalender."
+
+            except Exception as e:
+                return f"❌ Kon de afspraak niet maken: {str(e)}\n\nZorg dat je een kalender hebt gekoppeld in Settings."
+
+        elif parsed_command.command_type == CommandType.REMINDER:
+            # Reminder is just like calendar but with a simpler message and 5 min duration
+            try:
+                from datetime import timedelta
+                calendar_use_cases = CalendarEventUseCases(self.db)
+                today = datetime.now().strftime('%Y-%m-%d %H:%M')
+                extraction_prompt = f"""Extract reminder/event details from this request: "{parsed_command.original_text}"
+
+Return JSON with:
+- title (string, required - just the title without emoji)
+- start_time (ISO 8601 datetime, required)
+- description (string, optional)
+- location (string, optional)
+
+Note: Do NOT include end_time - reminders are 5 minutes by default.
+
+Current date and time context: {today}
+Use this as reference for relative dates like "morgen" (tomorrow), "vanavond" (tonight), etc."""
+
+                response = await self.claude_service.send_message(
+                    messages=[{"role": "user", "content": extraction_prompt}],
+                    system_prompt="You are a calendar assistant. Extract event details and respond with valid JSON only."
+                )
+
+                event_data = json.loads(response["content"][0]["text"])
+
+                # Parse ISO 8601 datetime strings to datetime objects
+                start_time = datetime.fromisoformat(event_data["start_time"].replace('Z', '+00:00'))
+                # Reminders are 5 minutes long
+                end_time = start_time + timedelta(minutes=5)
+
+                # Add bell emoji to title
+                title_with_icon = f"🔔 {event_data['title']}"
+
+                # Create the calendar event
+                event = await calendar_use_cases.create_event(
+                    user_id=conversation.user_id,
+                    title=title_with_icon,
+                    start_time=start_time,
+                    end_time=end_time,
+                    description=event_data.get("description"),
+                    location=event_data.get("location"),
+                )
+
+                return f"⏰ Herinnering aangemaakt!\n\n📝 {event_data['title']}\n🕐 {event.start_time.strftime('%d-%m-%Y %H:%M')}\n\nDe herinnering is toegevoegd aan je kalender."
+
+            except Exception as e:
+                return f"❌ Kon de herinnering niet maken: {str(e)}\n\nZorg dat je een kalender hebt gekoppeld in Settings."
 
         elif parsed_command.command_type == CommandType.NOTE:
             return "📝 Notitie functie wordt geactiveerd. Wat wil je noteren?\n\n" + parsed_command.get_help_text()

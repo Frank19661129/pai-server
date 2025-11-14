@@ -10,6 +10,7 @@ from enum import Enum
 class CommandType(Enum):
     """Available command types."""
     CALENDAR = "calendar"
+    REMINDER = "reminder"
     NOTE = "note"
     SCAN = "scan"
     HELP = "help"
@@ -45,6 +46,15 @@ Voorbeelden:
 - #calendar lijst deze week
 - #calendar verwijder afspraak <id>
 """,
+            CommandType.REMINDER: """⏰ Reminder commando's:
+
+#reminder - Maak een snelle herinnering
+
+Voorbeelden:
+- #reminder Supermarkt om 20:00 vanavond
+- #reminder Tandarts morgen 10:00
+- #reminder Bel moeder vrijdag 15:00
+""",
             CommandType.NOTE: """📝 Notitie commando's:
 
 #note maken - Nieuwe notitie
@@ -69,6 +79,7 @@ Voorbeelden:
             CommandType.HELP: """❓ Beschikbare commando's:
 
 📅 #calendar - Agenda beheer
+⏰ #reminder - Snelle herinneringen
 📝 #note - Notities maken
 📸 #scan - Documenten scannen
 ❓ #help - Deze help tekst
@@ -92,6 +103,8 @@ class CommandParser:
         "calendar": CommandType.CALENDAR,
         "agenda": CommandType.CALENDAR,
         "cal": CommandType.CALENDAR,
+        "reminder": CommandType.REMINDER,
+        "herinnering": CommandType.REMINDER,
         "note": CommandType.NOTE,
         "notitie": CommandType.NOTE,
         "scan": CommandType.SCAN,
@@ -155,6 +168,8 @@ class CommandParser:
 
         if command_type == CommandType.CALENDAR:
             params.update(cls._extract_calendar_params(text))
+        elif command_type == CommandType.REMINDER:
+            params.update(cls._extract_calendar_params(text))  # Same as calendar
         elif command_type == CommandType.NOTE:
             params.update(cls._extract_note_params(text))
         elif command_type == CommandType.SCAN:
