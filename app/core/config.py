@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
     # Application
     APP_NAME: str = "Claudine Server v1"
-    APP_VERSION: str = "1.0.0"
+    APP_VERSION: str = "0.1"
     DEBUG: bool = False
 
     # API
@@ -27,6 +27,18 @@ class Settings(BaseSettings):
 
     # CORS
     ALLOWED_ORIGINS: list[str] = ["*"]
+
+    # OAuth - Google
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+
+    # OAuth - Microsoft
+    MICROSOFT_CLIENT_ID: str = ""
+    MICROSOFT_CLIENT_SECRET: str = ""
+    MICROSOFT_TENANT_ID: str = "common"  # common for multi-tenant, or specific tenant ID
+
+    # External APIs
+    ANTHROPIC_API_KEY: Optional[str] = None  # For Claude AI integration (later)
 
     class Config:
         env_file = ".env"

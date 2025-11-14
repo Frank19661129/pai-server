@@ -16,7 +16,7 @@ from app.core.config import settings
 from app.infrastructure.database.session import Base
 
 # Import all models here for autogenerate support
-from app.infrastructure.database.models import UserModel  # noqa: F401
+from app.infrastructure.database.models import UserModel, OAuthTokenModel, UserSettingsModel  # noqa: F401
 
 # Alembic Config object
 config = context.config
