@@ -3,9 +3,9 @@ Authentication router.
 Part of Presentation layer - API endpoints.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from app.core.dependencies import get_db
+from app.core.dependencies import get_db, get_user_repository, get_current_user, oauth2_scheme
 from app.infrastructure.repositories.user_repository import UserRepository
 from app.application.use_cases.auth_use_cases import (
     RegisterUserUseCase,
@@ -21,43 +21,6 @@ from app.presentation.schemas.auth import (
 from app.infrastructure.services.jwt import extract_user_id_from_token
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
-
-# OAuth2 scheme for JWT token authentication
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
-
-
-def get_user_repository(db: Session = Depends(get_db)) -> UserRepository:
-    """Dependency to get user repository."""
-    return UserRepository(db)
-
-
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    user_repo: UserRepository = Depends(get_user_repository),
-) -> dict:
-    """
-    Dependency to get current authenticated user from JWT token.
-    Raises HTTPException if token is invalid or user not found.
-    """
-    user_id = extract_user_id_from_token(token)
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    use_case = GetCurrentUserUseCase(user_repo)
-    user = use_case.execute(str(user_id))
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    return user
 
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
