@@ -4,7 +4,7 @@ Part of Infrastructure layer - persistence models.
 """
 from datetime import datetime
 from sqlalchemy import Column, String, Boolean, DateTime, Text, ForeignKey, JSON, Integer, Sequence, Index
-from sqlalchemy.dialects.postgresql import UUID, ARRAY, TSVECTOR
+from sqlalchemy.dialects.postgresql import UUID, ARRAY, TSVECTOR, JSONB
 from sqlalchemy.orm import relationship
 import uuid
 from app.infrastructure.database.session import Base
@@ -268,3 +268,36 @@ class NoteItemModel(Base):
 
     def __repr__(self) -> str:
         return f"<NoteItemModel(id={self.id}, note_id={self.note_id}, content={self.content[:30]})>"
+
+
+class InboxItemModel(Base):
+    """
+    InboxItem database model.
+    Maps to the 'inbox_items' table in PostgreSQL.
+    """
+
+    __tablename__ = "inbox_items"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    type = Column(String(50), nullable=False)  # email, calendar_event, message, etc.
+    source = Column(String(100), nullable=False)  # gmail, outlook, manual, etc.
+    status = Column(String(50), nullable=False, default="unprocessed")
+    priority = Column(String(20), nullable=False, default="medium")
+    subject = Column(String(500), nullable=True)
+    content = Column(Text, nullable=True)
+    raw_data = Column(JSONB, nullable=True)
+    ai_suggestion = Column(JSONB, nullable=True)
+    user_decision = Column(JSONB, nullable=True)
+    linked_items = Column(JSONB, nullable=True, default=[])
+    processed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    user = relationship("UserModel")
+
+    # Indexes defined in migration
+
+    def __repr__(self) -> str:
+        return f"<InboxItemModel(id={self.id}, type={self.type}, status={self.status})>"

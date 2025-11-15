@@ -11,6 +11,7 @@ class CommandType(Enum):
     """Available command types."""
     CALENDAR = "calendar"
     REMINDER = "reminder"
+    TASK = "task"
     NOTE = "note"
     SCAN = "scan"
     HELP = "help"
@@ -55,6 +56,18 @@ Voorbeelden:
 - #reminder Tandarts morgen 10:00
 - #reminder Bel moeder vrijdag 15:00
 """,
+            CommandType.TASK: """✅ Taak commando's:
+
+#task of #taak - Maak een nieuwe taak
+
+Voorbeelden:
+- #task Rapport maken deadline volgende week
+- #taak Website updaten @Maria priority high
+- #task Boodschappen doen deadline vrijdag
+- #taak Factuur nakijken @Jan tags urgent,admin
+
+Gebruik @persoon om een taak te delegeren
+""",
             CommandType.NOTE: """📝 Notitie commando's:
 
 #note maken - Nieuwe notitie
@@ -80,12 +93,13 @@ Voorbeelden:
 
 📅 #calendar - Agenda beheer
 ⏰ #reminder - Snelle herinneringen
+✅ #task/#taak - Taken beheer
 📝 #note - Notities maken
 📸 #scan - Documenten scannen
 ❓ #help - Deze help tekst
 
 Gebruik #help <commando> voor meer info over een specifiek commando.
-Bijvoorbeeld: #help calendar
+Bijvoorbeeld: #help calendar of #help task
 """,
         }
 
@@ -105,6 +119,9 @@ class CommandParser:
         "cal": CommandType.CALENDAR,
         "reminder": CommandType.REMINDER,
         "herinnering": CommandType.REMINDER,
+        "task": CommandType.TASK,
+        "taak": CommandType.TASK,
+        "todo": CommandType.TASK,
         "note": CommandType.NOTE,
         "notitie": CommandType.NOTE,
         "scan": CommandType.SCAN,
@@ -170,6 +187,8 @@ class CommandParser:
             params.update(cls._extract_calendar_params(text))
         elif command_type == CommandType.REMINDER:
             params.update(cls._extract_calendar_params(text))  # Same as calendar
+        elif command_type == CommandType.TASK:
+            params.update(cls._extract_task_params(text))
         elif command_type == CommandType.NOTE:
             params.update(cls._extract_note_params(text))
         elif command_type == CommandType.SCAN:
@@ -201,6 +220,44 @@ class CommandParser:
             "action": action,
             "time_context": cls._extract_time_context(text_lower),
         }
+
+    @classmethod
+    def _extract_task_params(cls, text: str) -> Dict[str, Any]:
+        """Extract task-specific parameters including @person delegation."""
+        import re
+
+        params = {}
+
+        # Extract @person mentions for delegation
+        person_match = re.search(r'@(\w+)', text)
+        if person_match:
+            params["delegated_to"] = person_match.group(1)
+            # Remove @person from text for further processing
+            text = re.sub(r'@\w+', '', text)
+
+        # Extract priority
+        priority_match = re.search(r'priority\s+(low|medium|high)', text.lower())
+        if priority_match:
+            params["priority"] = priority_match.group(1)
+            text = re.sub(r'priority\s+(low|medium|high)', '', text, flags=re.IGNORECASE)
+
+        # Extract due date/deadline
+        deadline_match = re.search(r'deadline\s+(.+?)(?:\s+priority|\s+tags|\s+@|$)', text.lower())
+        if deadline_match:
+            params["due_date"] = deadline_match.group(1).strip()
+            text = re.sub(r'deadline\s+.+?(?=\s+priority|\s+tags|\s+@|$)', '', text, flags=re.IGNORECASE)
+
+        # Extract tags
+        tags_match = re.search(r'tags?\s+([\w,]+)', text.lower())
+        if tags_match:
+            tags_str = tags_match.group(1)
+            params["tags"] = [tag.strip() for tag in tags_str.split(',')]
+            text = re.sub(r'tags?\s+[\w,]+', '', text, flags=re.IGNORECASE)
+
+        # Remaining text is the task title
+        params["title"] = text.strip()
+
+        return params
 
     @classmethod
     def _extract_note_params(cls, text: str) -> Dict[str, Any]:

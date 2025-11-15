@@ -352,6 +352,52 @@ Use this as reference for relative dates like "morgen" (tomorrow), "vanavond" (t
             except Exception as e:
                 return f"❌ Kon de herinnering niet maken: {str(e)}\n\nZorg dat je een kalender hebt gekoppeld in Settings."
 
+        elif parsed_command.command_type == CommandType.TASK:
+            # Handle task creation
+            try:
+                from app.application.use_cases.task_use_cases import TaskUseCases
+                task_use_cases = TaskUseCases(self.db)
+
+                # Get parameters from command parser
+                params = parsed_command.parameters
+                title = params.get("title") or parsed_command.command_text
+
+                if not title or len(title.strip()) == 0:
+                    return "❌ Taak titel kan niet leeg zijn.\n\nVoorbeeld: #task Rapport maken deadline volgende week @Maria"
+
+                # Create task
+                task = task_use_cases.create_task(
+                    user_id=conversation.user_id,
+                    title=title,
+                    delegated_to_name=params.get("delegated_to"),
+                    due_date=params.get("due_date"),
+                    priority=params.get("priority", "medium"),
+                    tags=params.get("tags", []),
+                )
+
+                # Build response message
+                response_lines = [
+                    f"✅ Taak aangemaakt!",
+                    f"",
+                    f"**{task['formatted_id']}**: {task['title']}",
+                ]
+
+                if task.get("delegated_person_name"):
+                    response_lines.append(f"👤 Gedelegeerd aan: {task['delegated_person_name']}")
+
+                if task.get("due_date"):
+                    response_lines.append(f"📅 Deadline: {task['due_date']}")
+
+                response_lines.append(f"⚡ Prioriteit: {task['priority']}")
+
+                if task.get("tags"):
+                    response_lines.append(f"🏷️  Tags: {', '.join(task['tags'])}")
+
+                return "\n".join(response_lines)
+
+            except Exception as e:
+                return f"❌ Kon de taak niet maken: {str(e)}"
+
         elif parsed_command.command_type == CommandType.NOTE:
             return "📝 Notitie functie wordt geactiveerd. Wat wil je noteren?\n\n" + parsed_command.get_help_text()
 
@@ -462,3 +508,91 @@ Use this as reference for relative dates like "morgen" (tomorrow), "vanavond" (t
             raise ValueError("Conversation not found or access denied")
 
         return self.conversation_repo.delete_conversation(conversation_id)
+
+    async def generate_title(
+        self,
+        conversation_id: UUID,
+        user_id: UUID,
+    ) -> str:
+        """
+        Generate an AI-powered title for a conversation.
+
+        Uses Claude to summarize the conversation into a short, descriptive title.
+        Similar to Claude Desktop's automatic title generation.
+
+        Args:
+            conversation_id: Conversation ID
+            user_id: User ID (for authorization)
+
+        Returns:
+            Generated title string (2-5 words)
+
+        Raises:
+            ValueError: If conversation not found or access denied
+        """
+        # Get conversation
+        conversation = self.get_conversation(conversation_id, user_id)
+        if not conversation:
+            raise ValueError("Conversation not found or access denied")
+
+        # If no messages, return default
+        if not conversation.messages or len(conversation.messages) == 0:
+            return "Nieuwe chat"
+
+        # Get first few messages for context (max 5 messages or 500 chars)
+        messages_context = []
+        total_chars = 0
+        for msg in conversation.messages[:5]:
+            if total_chars > 500:
+                break
+            messages_context.append(f"{msg.role}: {msg.content}")
+            total_chars += len(msg.content)
+
+        context = "\n".join(messages_context)
+
+        # Ask Claude to generate a short title
+        prompt = f"""Geef een korte, beschrijvende titel (2-5 woorden) voor dit gesprek:
+
+{context}
+
+Regels:
+- Maximaal 5 woorden
+- Beschrijf het hoofdonderwerp
+- In het Nederlands
+- Geen aanhalingstekens of speciale tekens
+- Gewoon de titel, niets anders
+
+Titel:"""
+
+        try:
+            response = await self.claude_service.send_message(
+                messages=[{"role": "user", "content": prompt}],
+                system_prompt="Je bent een expert in het maken van korte, beschrijvende titels. Geef alleen de titel, niets anders.",
+                max_tokens=50,
+                temperature=0.7,
+            )
+
+            # Extract title from response
+            title = response["content"][0]["text"].strip()
+
+            # Remove quotes if present
+            title = title.strip('"').strip("'")
+
+            # Limit to 50 chars
+            if len(title) > 50:
+                title = title[:50].strip()
+
+            # Update conversation title
+            self.conversation_repo.update_conversation(conversation_id, title=title)
+
+            return title
+
+        except Exception as e:
+            # Fallback to first message preview if AI generation fails
+            first_user_msg = next((msg for msg in conversation.messages if msg.role == "user"), None)
+            if first_user_msg:
+                fallback = first_user_msg.content[:30].strip()
+                if len(first_user_msg.content) > 30:
+                    fallback += "..."
+                return fallback
+            return "Nieuwe chat"

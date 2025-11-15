@@ -399,3 +399,35 @@ async def get_messages(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get messages: {str(e)}",
         )
+
+
+@router.post("/{conversation_id}/generate-title")
+async def generate_conversation_title(
+    conversation_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Generate an AI-powered title for a conversation.
+
+    Uses Claude to analyze the conversation and create a short,
+    descriptive title (2-5 words) similar to Claude Desktop's auto-titling.
+    """
+    try:
+        use_cases = ConversationUseCases(db)
+        title = await use_cases.generate_title(
+            conversation_id=conversation_id,
+            user_id=current_user["id"],
+        )
+
+        return {"title": title, "success": True}
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate title: {str(e)}",
+        )
