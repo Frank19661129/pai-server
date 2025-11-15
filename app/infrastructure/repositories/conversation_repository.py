@@ -4,7 +4,7 @@ Part of Infrastructure layer.
 """
 from typing import Optional, List
 from uuid import UUID
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 
 from app.infrastructure.database.models import ConversationModel, MessageModel
@@ -92,7 +92,9 @@ class ConversationRepository:
         Returns:
             List of ConversationModel
         """
-        query = self.db.query(ConversationModel).filter(
+        query = self.db.query(ConversationModel).options(
+            joinedload(ConversationModel.messages)
+        ).filter(
             ConversationModel.user_id == user_id
         )
 
