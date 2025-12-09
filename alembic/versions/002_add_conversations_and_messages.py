@@ -26,7 +26,7 @@ def upgrade() -> None:
         sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('title', sa.String(length=500), nullable=False),
         sa.Column('mode', sa.String(length=50), nullable=False, server_default='chat'),
-        sa.Column('metadata', postgresql.JSON, nullable=True),
+        sa.Column('meta', postgresql.JSON, nullable=True),
         sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
         sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
@@ -41,7 +41,7 @@ def upgrade() -> None:
         sa.Column('conversation_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('role', sa.String(length=50), nullable=False),
         sa.Column('content', sa.Text(), nullable=False),
-        sa.Column('metadata', postgresql.JSON, nullable=True),
+        sa.Column('meta', postgresql.JSON, nullable=True),
         sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
         sa.ForeignKeyConstraint(['conversation_id'], ['conversations.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id')
